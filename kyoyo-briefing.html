@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>教養ブリーフィング</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, 'Helvetica Neue', sans-serif; background: #f5f5f5; min-height: 100vh; display: flex; justify-content: center; }
+  .app { width: 100%; max-width: 430px; background: white; min-height: 100vh; display: flex; flex-direction: column; position: relative; }
+
+/* Setup screen */
+#setup-screen { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 40px 24px; }
+.setup-logo { font-size: 22px; font-weight: 700; color: #111; letter-spacing: -0.02em; margin-bottom: 8px; }
+.setup-sub { font-size: 13px; color: #aaa; margin-bottom: 40px; }
+.setup-label { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 8px; }
+.setup-input { width: 100%; padding: 13px 14px; border-radius: 12px; border: 1px solid #ddd; font-size: 14px; outline: none; background: #fafafa; margin-bottom: 10px; font-family: monospace; }
+.setup-input:focus { border-color: #999; }
+.setup-note { font-size: 12px; color: #bbb; margin-bottom: 24px; line-height: 1.6; }
+.setup-btn { width: 100%; padding: 14px; border-radius: 14px; background: #111; color: white; border: none; font-size: 15px; font-weight: 600; cursor: pointer; }
+.setup-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.setup-err { font-size: 13px; color: #c00; margin-top: 10px; display: none; }
+
+/* Main app */
+#main-screen { display: none; flex-direction: column; flex: 1; padding-bottom: 76px; }
+.header { padding: 20px 16px 14px; border-bottom: 0.5px solid #eee; }
+.header-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; }
+.header-title { font-size: 18px; font-weight: 700; color: #111; letter-spacing: -0.02em; }
+.header-date { font-size: 11px; color: #bbb; }
+.header-sub { font-size: 12px; color: #aaa; }
+
+.depth-row { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 0.5px solid #eee; }
+.depth-btn { flex: 1; padding: 9px 0; font-size: 13px; border-radius: 22px; border: 0.5px solid #ddd; background: white; color: #777; cursor: pointer; font-weight: 400; transition: all 0.15s; }
+.depth-btn.on { background: #111; color: white; border-color: transparent; font-weight: 600; }
+
+.cat-scroll { display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto; scrollbar-width: none; border-bottom: 0.5px solid #eee; -webkit-overflow-scrolling: touch; }
+.cat-scroll::-webkit-scrollbar { display: none; }
+.cat-tag { flex-shrink: 0; font-size: 12px; padding: 6px 14px; border-radius: 20px; white-space: nowrap; cursor: pointer; background: #f3f3f3; color: #777; font-weight: 400; transition: all 0.15s; border: none; }
+.cat-tag.on { color: white; font-weight: 600; }
+
+.hint-bar { padding: 9px 16px; background: #fafafa; border-bottom: 0.5px solid #eee; display: flex; align-items: center; gap: 6px; }
+.hint-count { font-size: 12px; color: #999; }
+.hint-count strong { color: #333; }
+.hint-right { margin-left: auto; font-size: 11px; color: #bbb; }
+
+/* Generate button */
+.gen-wrap { padding: 16px; }
+.gen-btn { width: 100%; padding: 14px; border-radius: 14px; background: #111; color: white; border: none; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: opacity 0.15s; }
+.gen-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.progress { height: 3px; background: #eee; margin: 0 16px 12px; border-radius: 2px; display: none; overflow: hidden; }
+.progress-fill { height: 100%; background: #111; border-radius: 2px; width: 0%; transition: width 0.4s ease; }
+.spinner { width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,0.35); border-top-color: white; border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Cards */
+.card { border-bottom: 0.5px solid #ebebeb; background: white; transition: background 0.12s; }
+.card.open { background: #fafafa; }
+.card-header { padding: 16px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.card-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; }
+.cat-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.cat-badge { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; }
+.chevron { margin-left: auto; font-size: 13px; color: #ccc; transition: transform 0.2s; display: inline-block; }
+.card.open .chevron { transform: rotate(180deg); }
+.card-title { font-size: 15px; font-weight: 600; color: #111; line-height: 1.45; margin-bottom: 7px; letter-spacing: -0.01em; }
+.card-summary { font-size: 13px; color: #666; line-height: 1.75; }
+.card-detail { display: none; padding: 0 16px 16px; }
+.card.open .card-detail { display: block; }
+.insight-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; margin-bottom: 6px; }
+.insight-box { font-size: 13px; color: #333; line-height: 1.8; background: #f7f7f7; padding: 12px 14px; border-radius: 10px; border-left: 3px solid #ccc; }
+
+/* Glossary term underline */
+.gterm { border-bottom: 1.5px dotted #aaa; cursor: pointer; }
+
+/* Bottom ask bar */
+.ask-bar { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 430px; padding: 12px 16px 20px; background: white; border-top: 0.5px solid #eee; z-index: 50; }
+.ask-trigger { width: 100%; padding: 13px 16px; border-radius: 14px; background: #f3f3f3; border: none; font-size: 14px; color: #888; cursor: pointer; display: flex; align-items: center; gap: 10px; text-align: left; }
+
+/* Drawer overlay */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 100; display: none; align-items: flex-end; justify-content: center; }
+.overlay.show { display: flex; }
+.drawer { background: white; border-radius: 18px 18px 0 0; padding: 20px 16px 32px; width: 100%; max-width: 430px; }
+.drawer-handle { width: 36px; height: 4px; background: #ddd; border-radius: 2px; margin: 0 auto 18px; }
+.drawer-title { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 14px; }
+.ask-row { display: flex; gap: 8px; margin-bottom: 16px; }
+.ask-input { flex: 1; padding: 11px 14px; border-radius: 12px; border: 0.5px solid #ddd; font-size: 14px; outline: none; background: #fafafa; font-family: inherit; }
+.ask-input:focus { border-color: #999; }
+.ask-send { padding: 11px 16px; border-radius: 12px; background: #111; color: white; border: none; font-size: 14px; cursor: pointer; font-weight: 600; white-space: nowrap; }
+.ask-send:disabled { opacity: 0.5; cursor: not-allowed; }
+.quick-label { font-size: 12px; color: #aaa; margin-bottom: 10px; }
+.quick-btn { display: block; width: 100%; text-align: left; padding: 10px 14px; border-radius: 10px; border: 0.5px solid #eee; background: white; font-size: 13px; color: #444; cursor: pointer; margin-bottom: 6px; font-family: inherit; line-height: 1.4; }
+.ai-answer { margin-top: 14px; padding: 14px; background: #f7f7f7; border-radius: 12px; font-size: 13px; color: #333; line-height: 1.8; display: none; max-height: 240px; overflow-y: auto; }
+.ai-answer.show { display: block; }
+
+/* Glossary popup */
+.goverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 110; display: none; align-items: flex-end; justify-content: center; }
+.goverlay.show { display: flex; }
+.gpopup { background: white; border-radius: 18px 18px 0 0; padding: 24px 20px 32px; width: 100%; max-width: 430px; }
+.ghandle { width: 36px; height: 4px; background: #ddd; border-radius: 2px; margin: 0 auto 20px; }
+.glabel { font-size: 13px; font-weight: 700; color: #999; letter-spacing: 0.05em; margin-bottom: 8px; }
+.gterm-title { font-size: 17px; font-weight: 700; color: #111; margin-bottom: 12px; letter-spacing: -0.01em; }
+.gdef { font-size: 14px; color: #444; line-height: 1.8; }
+.gclose { margin-top: 20px; width: 100%; padding: 12px; border-radius: 12px; background: #f3f3f3; border: none; font-size: 14px; color: #666; cursor: pointer; font-weight: 500; }
+
+.empty { text-align: center; padding: 3rem 16px; color: #ccc; font-size: 14px; line-height: 2; }
+.footer { padding: 20px 16px; text-align: center; }
+.footer p { font-size: 12px; color: #ddd; }
+</style>
+
+</head>
+<body>
+<div class="app">
+
+  <!-- Setup screen -->
+
+  <div id="setup-screen">
+    <div class="setup-logo">教養ブリーフィング</div>
+    <div class="setup-sub">リーダー向け · 7つの教養領域</div>
+    <div class="setup-label">Anthropic APIキーを入力</div>
+    <input class="setup-input" id="api-key-input" type="password" placeholder="sk-ant-..." autocomplete="off" />
+    <div class="setup-note">
+      キーはこのデバイスのみに保存され、外部には送信されません。<br>
+      取得先: platform.anthropic.com → API Keys
+    </div>
+    <button class="setup-btn" id="setup-btn" onclick="startApp()">はじめる</button>
+    <div class="setup-err" id="setup-err">APIキーが正しくありません。sk-ant- で始まるキーを入力してください。</div>
+  </div>
+
+  <!-- Main screen -->
+
+  <div id="main-screen">
+    <div class="header">
+      <div class="header-row">
+        <span class="header-title">教養ブリーフィング</span>
+        <span class="header-date" id="today-label"></span>
+      </div>
+      <div class="header-sub">7つの教養領域 · リーダー向けAI解説</div>
+    </div>
+
+```
+<div class="depth-row">
+  <button class="depth-btn on" onclick="setDepth('short',this)">3分</button>
+  <button class="depth-btn" onclick="setDepth('medium',this)">10分</button>
+  <button class="depth-btn" onclick="setDepth('deep',this)">じっくり</button>
+</div>
+
+<div class="cat-scroll" id="cat-scroll"></div>
+
+<div class="gen-wrap">
+  <button class="gen-btn" id="gen-btn" onclick="generateBriefing()">
+    <span id="gen-label">今日のブリーフィングを生成</span>
+  </button>
+</div>
+<div class="progress" id="progress"><div class="progress-fill" id="pfill"></div></div>
+
+<div class="hint-bar" id="hint-bar" style="display:none;">
+  <span class="hint-count">今日のトピック <strong id="topic-count">0</strong>件</span>
+  <span class="hint-right">点線の用語をタップで解説</span>
+</div>
+
+<div id="cards-container">
+  <div class="empty">ボタンを押すと<br>7つの教養領域から<br>今日のトピックが届きます</div>
+</div>
+
+<div class="footer"><p>翌日は「再生成する」を押してください</p></div>
+```
+
+  </div>
+
+  <!-- Ask bar -->
+
+  <div class="ask-bar" id="ask-bar" style="display:none;">
+    <button class="ask-trigger" onclick="openAsk()">
+      <span style="font-size:16px;">💬</span>
+      <span>わからない言葉・気になることを質問…</span>
+    </button>
+  </div>
+
+  <!-- Ask drawer -->
+
+  <div class="overlay" id="ask-overlay" onclick="closeAsk()">
+    <div class="drawer" onclick="event.stopPropagation()">
+      <div class="drawer-handle"></div>
+      <div class="drawer-title">Claudeに質問する</div>
+      <div class="ask-row">
+        <input class="ask-input" id="ask-input" placeholder="わからない言葉や気になることを入力…" onkeydown="if(event.key==='Enter')sendQuestion()" />
+        <button class="ask-send" id="ask-send-btn" onclick="sendQuestion()">送信</button>
+      </div>
+      <div class="ai-answer" id="ai-answer"></div>
+      <div class="quick-label">よくある質問</div>
+      <button class="quick-btn" onclick="sendQuestion('VIX指数とは何ですか？わかりやすく教えてください')">VIX指数って何？</button>
+      <button class="quick-btn" onclick="sendQuestion('日銀の利上げが企業経営に与える影響を教えてください')">日銀の利上げが企業に与える影響は？</button>
+      <button class="quick-btn" onclick="sendQuestion('サプライチェーンリスクへの具体的な対策を教えてください')">サプライチェーンリスクへの対策は？</button>
+      <button class="quick-btn" onclick="sendQuestion('DOGEとは何か、日本版DOGEも含めてわかりやすく説明してください')">DOGEとは何か説明して</button>
+      <button class="quick-btn" onclick="sendQuestion('BCPとは何ですか？企業が最低限やるべきことを教えてください')">BCPって何？企業がすべきことは？</button>
+    </div>
+  </div>
+
+  <!-- Glossary popup -->
+
+  <div class="goverlay" id="g-overlay" onclick="closeGlossary()">
+    <div class="gpopup" onclick="event.stopPropagation()">
+      <div class="ghandle"></div>
+      <div class="glabel">用語解説</div>
+      <div class="gterm-title" id="g-term"></div>
+      <div class="gdef" id="g-def"></div>
+      <button class="gclose" onclick="closeGlossary()">閉じる</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const CATEGORIES = [
+  { key:"経済",         color:"#185FA5", bg:"#E6F1FB", text:"#0C447C" },
+  { key:"人口動態",     color:"#0F6E56", bg:"#E1F5EE", text:"#085041" },
+  { key:"政治",         color:"#993C1D", bg:"#FAECE7", text:"#712B13" },
+  { key:"テクノロジー", color:"#534AB7", bg:"#EEEDFE", text:"#3C3489" },
+  { key:"社会・文化",   color:"#993356", bg:"#FBEAF0", text:"#72243E" },
+  { key:"歴史",         color:"#5F5E5A", bg:"#F1EFE8", text:"#444441" },
+  { key:"インフラ",     color:"#854F0B", bg:"#FAEEDA", text:"#633806" },
+];
+
+const GLOSSARY = {
+  "VIX指数":"「恐怖指数」とも呼ばれる。株式市場の将来の変動リスクを示す指標。数値が高いほど市場の不安が大きいことを意味する。",
+  "ホルムズ海峡":"ペルシャ湾とオマーン湾をつなぐ重要な海峡。世界の石油輸送量の約20%が通過するため、ここが封鎖されると原油価格が急騰する。",
+  "DOGE":"「Department of Government Efficiency」の略。米国トランプ政権が設立した政府支出削減を目的とする機関。日本版はその概念を参考に歳出削減を推進する取り組み。",
+  "BCP":"「Business Continuity Plan（事業継続計画）」の略。災害・事故・パンデミックなど緊急事態が発生した際に事業を継続・早期に復旧するための計画。",
+  "EAP":"「Employee Assistance Program（従業員支援プログラム）」の略。従業員のメンタルヘルスや個人的な問題を支援するための職場プログラム。",
+  "サプライチェーン":"原材料の調達から製品が消費者に届くまでの一連の流れ（供給網）。複数の企業や物流が絡み合っており一部が滞ると全体に影響が出る。",
+  "概算要求":"各省庁が翌年度の予算として必要な金額を財務省に要求すること。毎年8月末が締め切りで、これをもとに政府予算案が作成される。",
+  "ヘッジ":"リスクを軽減するための手段。例えば円安リスクに対して外貨を保有したり先物取引を使って価格変動の影響を抑える手法。",
+  "バリュエーション":"企業や資産の価値を評価すること。株式市場では「株価が実態に見合っているか」を判断する指標として使われる。",
+  "ROI":"「Return on Investment（投資収益率）」の略。投資した費用に対してどれだけの利益が得られたかを示す指標。",
+  "共同親権":"離婚後も父母の両方が子どもの親権を持つ制度。2026年4月から日本で選択可能になった。",
+  "在職老齢年金":"働きながら年金を受け取る際、収入が一定額を超えると年金が減額・停止される制度。2026年度に見直しが行われた。",
+};
+
+const DEPTH_LABELS = { short:"3分", medium:"10分", deep:"じっくり" };
+const DEPTH_INST = {
+  short:"各summaryは70字以内、insightは50字以内で端的に",
+  medium:"各summaryは130字程度、insightは90字程度",
+  deep:"各summaryは220字程度、insightは150字程度で深く掘り下げて"
+};
+
+let apiKey = "";
+let currentDepth = "short";
+let currentCat = "all";
+let allCards = [];
+let openCardIdx = null;
+
+// ── Setup ──
+function startApp() {
+  const key = document.getElementById("api-key-input").value.trim();
+  if (!key.startsWith("sk-ant-")) {
+    document.getElementById("setup-err").style.display = "block";
+    return;
+  }
+  apiKey = key;
+  localStorage.setItem("kyoyo_api_key", key);
+  showMain();
+}
+
+function showMain() {
+  document.getElementById("setup-screen").style.display = "none";
+  const main = document.getElementById("main-screen");
+  main.style.display = "flex";
+  document.getElementById("ask-bar").style.display = "block";
+  const d = new Date();
+  document.getElementById("today-label").textContent = d.toLocaleDateString("ja-JP", { month:"long", day:"numeric", weekday:"short" });
+  buildCatScroll();
+}
+
+// ── Category tabs ──
+function buildCatScroll() {
+  const el = document.getElementById("cat-scroll");
+  const all = [{ key:"all", label:"すべて" }, ...CATEGORIES.map(c => ({ key:c.key, label:c.key }))];
+  el.innerHTML = all.map(({ key, label }) => {
+    const cat = CATEGORIES.find(c => c.key === key);
+    const isAll = key === "all";
+    return `<button class="cat-tag${key==="all"?" on":""}" data-cat="${key}"
+      style="${key==="all"&&false ? "" : ""}"
+      onclick="setCat('${key}',this)">${label}</button>`;
+  }).join("");
+  updateCatStyles();
+}
+
+function updateCatStyles() {
+  document.querySelectorAll(".cat-tag").forEach(btn => {
+    const key = btn.dataset.cat;
+    const on = key === currentCat;
+    const cat = CATEGORIES.find(c => c.key === key);
+    if (on) {
+      btn.style.background = key === "all" ? "#111" : cat.color;
+      btn.style.color = "white";
+      btn.style.fontWeight = "600";
+    } else {
+      btn.style.background = "#f3f3f3";
+      btn.style.color = "#777";
+      btn.style.fontWeight = "400";
+    }
+  });
+}
+
+function setCat(cat, el) {
+  currentCat = cat;
+  updateCatStyles();
+  renderCards();
+}
+
+function setDepth(d, el) {
+  currentDepth = d;
+  document.querySelectorAll(".depth-btn").forEach(b => b.classList.remove("on"));
+  el.classList.add("on");
+}
+
+// ── Generate ──
+async function generateBriefing() {
+  const btn = document.getElementById("gen-btn");
+  const label = document.getElementById("gen-label");
+  const prog = document.getElementById("progress");
+  const pfill = document.getElementById("pfill");
+
+  btn.disabled = true;
+  label.innerHTML = '<span class="spinner"></span>';
+  prog.style.display = "block";
+  let p = 0;
+  const timer = setInterval(() => { p = Math.min(p + Math.random()*10, 88); pfill.style.width = p + "%"; }, 350);
+
+  const today = new Date().toLocaleDateString("ja-JP");
+  const prompt = `あなたはリーダー向け教養キュレーターです。今日(${today})のトピックを7つの教養領域から1つずつ選び、JSONのみで返してください（\`\`\`不要）。
+領域: 経済, 人口動態, 政治, テクノロジー, 社会・文化, 歴史, インフラ
+${DEPTH_INST[currentDepth]}
+歴史領域は今日の日付に関連する歴史的出来事を選ぶこと。
+[{"category":"経済","title":"25字以内","summary":"概要","insight":"リーダーへの示唆"},...]
+必ず7項目すべて返すこと。`;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type":"application/json", "x-api-key": apiKey, "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1400, messages:[{ role:"user", content:prompt }] })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    const raw = data.content.map(x => x.text||"").join("").replace(/```json|```/g,"").trim();
+    allCards = JSON.parse(raw);
+    clearInterval(timer); pfill.style.width = "100%";
+    setTimeout(() => { prog.style.display = "none"; pfill.style.width = "0%"; }, 300);
+    document.getElementById("hint-bar").style.display = "flex";
+    renderCards();
+    label.textContent = "再生成する";
+  } catch(e) {
+    clearInterval(timer); prog.style.display = "none";
+    document.getElementById("cards-container").innerHTML = `<div class="empty">生成に失敗しました。<br>APIキーを確認してください。<br><small style="color:#f99">${e.message}</small></div>`;
+    label.textContent = "再試行";
+  }
+  btn.disabled = false;
+}
+
+// ── Render cards ──
+function renderCards() {
+  const list = currentCat === "all" ? allCards : allCards.filter(d => d.category === currentCat);
+  document.getElementById("topic-count").textContent = list.length;
+  const container = document.getElementById("cards-container");
+  if (!list.length) { container.innerHTML = '<div class="empty">このカテゴリにはトピックがありません</div>'; return; }
+
+  container.innerHTML = list.map((item, i) => {
+    const cat = CATEGORIES.find(c => c.key === item.category) || CATEGORIES[5];
+    return `
+    <div class="card" id="card-${i}">
+      <div class="card-header" onclick="toggleCard(${i})">
+        <div class="card-meta">
+          <span class="cat-dot" style="background:${cat.color}"></span>
+          <span class="cat-badge" style="background:${cat.bg};color:${cat.text}">${item.category}</span>
+          <span class="chevron">▾</span>
+        </div>
+        <div class="card-title">${item.title}</div>
+        <div class="card-summary">${highlightTerms(item.summary)}</div>
+      </div>
+      <div class="card-detail" id="detail-${i}">
+        <div style="border-top:0.5px solid #eee;padding-top:14px;">
+          <div class="insight-label" style="color:${cat.color}">リーダーへの示唆</div>
+          <div class="insight-box" style="border-left-color:${cat.color}">${highlightTerms(item.insight)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+  openCardIdx = null;
+}
+
+function toggleCard(i) {
+  const card = document.getElementById("card-"+i);
+  const detail = document.getElementById("detail-"+i);
+  const isOpen = card.classList.contains("open");
+  document.querySelectorAll(".card").forEach(c => c.classList.remove("open"));
+  document.querySelectorAll(".card-detail").forEach(d => d.style.display = "none");
+  if (!isOpen) {
+    card.classList.add("open");
+    detail.style.display = "block";
+    openCardIdx = i;
+  } else {
+    openCardIdx = null;
+  }
+}
+
+// ── Glossary highlight ──
+function highlightTerms(text) {
+  const terms = Object.keys(GLOSSARY);
+  const regex = new RegExp(`(${terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")})`, "g");
+  return text.replace(regex, `<span class="gterm" onclick="event.stopPropagation();openGlossary('$1')">$1</span>`);
+}
+
+function openGlossary(term) {
+  document.getElementById("g-term").textContent = term;
+  document.getElementById("g-def").textContent = GLOSSARY[term] || "";
+  document.getElementById("g-overlay").classList.add("show");
+}
+function closeGlossary() { document.getElementById("g-overlay").classList.remove("show"); }
+
+// ── Ask drawer ──
+function openAsk() {
+  document.getElementById("ask-overlay").classList.add("show");
+  document.getElementById("ai-answer").classList.remove("show");
+  document.getElementById("ai-answer").textContent = "";
+  document.getElementById("ask-input").value = "";
+  setTimeout(() => document.getElementById("ask-input").focus(), 150);
+}
+function closeAsk() { document.getElementById("ask-overlay").classList.remove("show"); }
+
+async function sendQuestion(preset) {
+  const q = preset || document.getElementById("ask-input").value.trim();
+  if (!q) return;
+  const answerEl = document.getElementById("ai-answer");
+  const sendBtn = document.getElementById("ask-send-btn");
+  sendBtn.disabled = true;
+  answerEl.textContent = "考え中…";
+  answerEl.classList.add("show");
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type":"application/json", "x-api-key": apiKey, "anthropic-version":"2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 600,
+        system: "あなたはリーダー向けの教養コーチです。質問に対して日本語で簡潔かつ実践的に答えてください。専門用語はわかりやすく言い換えてください。300字以内で答えてください。",
+        messages: [{ role:"user", content: q }]
+      })
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error.message);
+    answerEl.textContent = data.content[0].text;
+  } catch(e) {
+    answerEl.textContent = "エラーが発生しました: " + e.message;
+  }
+  sendBtn.disabled = false;
+}
+
+// ── Init ──
+const savedKey = localStorage.getItem("kyoyo_api_key");
+if (savedKey && savedKey.startsWith("sk-ant-")) {
+  apiKey = savedKey;
+  showMain();
+}
+</script>
+
+</body>
+</html>
